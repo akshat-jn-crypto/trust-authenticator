@@ -175,6 +175,7 @@ export default async function PublicProfilePage({
                     );
                     if (entries.length === 0) return null;
                     const matchesDoc = claim.details_check?.overall === 'match';
+                    const fieldChecks = claim.details_check?.fields ?? {};
                     return (
                       <div key={i}>
                         <div className="mb-1 flex items-center gap-2">
@@ -205,14 +206,27 @@ export default async function PublicProfilePage({
                           )}
                         </div>
                         <dl className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
-                          {entries.map(([key, value]) => (
-                            <div key={key} className="flex justify-between gap-2 text-sm">
-                              <dt className="text-slate-400">{key}</dt>
-                              <dd className="text-right font-medium text-slate-800">
-                                {value}
-                              </dd>
-                            </div>
-                          ))}
+                          {entries.map(([key, value]) => {
+                            const fieldMatched =
+                              issuerSigned || fieldChecks[key]?.matches === true;
+                            return (
+                              <div key={key} className="flex justify-between gap-2 text-sm">
+                                <dt className="text-slate-400">{key}</dt>
+                                <dd className="flex items-center justify-end gap-1 text-right font-medium text-slate-800">
+                                  {fieldMatched && (
+                                    <span
+                                      className="text-emerald-600"
+                                      title="Confirmed against the document"
+                                      aria-label="verified"
+                                    >
+                                      ✓
+                                    </span>
+                                  )}
+                                  {value}
+                                </dd>
+                              </div>
+                            );
+                          })}
                         </dl>
                       </div>
                     );
