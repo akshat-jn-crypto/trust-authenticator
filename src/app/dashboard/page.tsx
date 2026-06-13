@@ -7,6 +7,7 @@ import DocumentList from '@/components/DocumentList';
 import TrustScoreBar from '@/components/TrustScoreBar';
 import CopyLinkButton from '@/components/CopyLinkButton';
 import SetPasswordCard from '@/components/SetPasswordCard';
+import ShareLinkManager from '@/components/ShareLinkManager';
 import {
   CATEGORIES,
   CATEGORY_ORDER,
@@ -137,6 +138,11 @@ export default async function DashboardPage() {
             </section>
           );
         })}
+      </div>
+
+      {/* Scoped share links */}
+      <div className="mt-8">
+        <ShareLinkManager documents={docs} />
       </div>
 
       {/* Account settings */}

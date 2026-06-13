@@ -63,6 +63,24 @@ export interface DetailsCheck {
   checked_at: string;
 }
 
+export interface ShareLinkDocConfig {
+  show_document: boolean;
+  fields: string[];
+}
+
+export interface ShareLinkConfig {
+  documents: Record<string, ShareLinkDocConfig>;
+}
+
+export interface ShareLink {
+  id: string;
+  owner_id: string;
+  slug: string;
+  name: string;
+  config: ShareLinkConfig;
+  created_at: string;
+}
+
 export interface PublicClaim {
   category: DocCategory;
   doc_type: string;
