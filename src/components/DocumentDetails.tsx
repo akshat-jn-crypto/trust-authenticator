@@ -9,9 +9,14 @@ import { claimFieldsFor, type DetailsCheck, type DocumentRow } from '@/lib/types
 // These appear on the public Trust Link; the file never does.
 export default function DocumentDetails({ doc }: { doc: DocumentRow }) {
   const router = useRouter();
-  const fields = claimFieldsFor(doc.doc_type);
+  // Custom, user-defined fields: a list of name/value rows. Seeded
+  // from existing details, or from suggestions for a fresh document.
+  const [rows, setRows] = useState<{ key: string; value: string }[]>(() => {
+    const existing = Object.entries(doc.details ?? {});
+    if (existing.length > 0) return existing.map(([key, value]) => ({ key, value }));
+    return claimFieldsFor(doc.doc_type).map((key) => ({ key, value: '' }));
+  });
   const [open, setOpen] = useState(false);
-  const [values, setValues] = useState<Record<string, string>>(doc.details ?? {});
   const [saving, setSaving] = useState(false);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,11 +29,12 @@ export default function DocumentDetails({ doc }: { doc: DocumentRow }) {
   async function save() {
     setSaving(true);
     setError(null);
-    // Drop empty fields so the public RPC (details <> '{}') hides
-    // documents with no claims.
+    // Keep only rows with both a field name and a value; later rows
+    // with the same name win. Empty rows are dropped so the public RPC
+    // (details <> '{}') hides documents with no claims.
     const clean: Record<string, string> = {};
-    for (const [k, v] of Object.entries(values)) {
-      if (v.trim()) clean[k] = v.trim();
+    for (const { key, value } of rows) {
+      if (key.trim() && value.trim()) clean[key.trim()] = value.trim();
     }
     const supabase = createClient();
     const { error } = await supabase
@@ -119,22 +125,49 @@ export default function DocumentDetails({ doc }: { doc: DocumentRow }) {
   return (
     <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
       <p className="mb-2 text-xs text-slate-500">
-        Shown on your public Trust Link. Do not enter ID numbers or other
-        secrets — only shareable facts.
+        Add any fields you want to share for this document. Do not enter ID
+        numbers or other secrets — only shareable facts.
       </p>
-      <div className="grid gap-2 sm:grid-cols-2">
-        {fields.map((field) => (
-          <label key={field} className="block">
-            <span className="text-xs font-medium text-slate-600">{field}</span>
+      <div className="space-y-2">
+        {rows.map((row, i) => (
+          <div key={i} className="flex items-center gap-2">
             <input
-              value={values[field] ?? ''}
+              value={row.key}
               onChange={(e) =>
-                setValues((v) => ({ ...v, [field]: e.target.value }))
+                setRows((rs) =>
+                  rs.map((r, j) => (j === i ? { ...r, key: e.target.value } : r))
+                )
               }
-              className="mt-0.5 w-full rounded-md border border-slate-300 px-2 py-1 text-sm shadow-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
+              placeholder="Field name"
+              className="w-2/5 rounded-md border border-slate-300 px-2 py-1 text-sm shadow-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
             />
-          </label>
+            <input
+              value={row.value}
+              onChange={(e) =>
+                setRows((rs) =>
+                  rs.map((r, j) => (j === i ? { ...r, value: e.target.value } : r))
+                )
+              }
+              placeholder="Value"
+              className="flex-1 rounded-md border border-slate-300 px-2 py-1 text-sm shadow-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
+            />
+            <button
+              type="button"
+              onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}
+              className="shrink-0 rounded px-2 py-1 text-sm text-slate-400 hover:bg-slate-200 hover:text-red-600"
+              aria-label="Remove field"
+            >
+              ✕
+            </button>
+          </div>
         ))}
+        <button
+          type="button"
+          onClick={() => setRows((rs) => [...rs, { key: '', value: '' }])}
+          className="text-xs font-medium text-brand-700 hover:underline"
+        >
+          + Add field
+        </button>
       </div>
       {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
       <div className="mt-3 flex gap-2">

@@ -18,12 +18,18 @@ export default function UploadComponent({
 }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [docType, setDocType] = useState(CATEGORIES[category].docTypes[0]);
+  const [docType, setDocType] = useState('');
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleUpload(file: File) {
     setError(null);
+
+    if (!docType.trim()) {
+      setError('Type a document name first.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
 
     if (file.size > MAX_SIZE_MB * 1024 * 1024) {
       setError(`File is too large (max ${MAX_SIZE_MB} MB).`);
@@ -60,7 +66,7 @@ export default function UploadComponent({
     const { error: dbError } = await supabase.from('documents').insert({
       owner_id: user.id,
       category,
-      doc_type: docType,
+      doc_type: docType.trim(),
       file_path: filePath,
       file_name: file.name,
     });
@@ -81,18 +87,20 @@ export default function UploadComponent({
   return (
     <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <select
+        <input
+          type="text"
           value={docType}
           onChange={(e) => setDocType(e.target.value)}
           disabled={uploading}
+          list={`doctypes-${category}`}
+          placeholder="Document name (e.g. Salary Slip)"
           className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-600 focus:outline-none"
-        >
+        />
+        <datalist id={`doctypes-${category}`}>
           {CATEGORIES[category].docTypes.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
+            <option key={t} value={t} />
           ))}
-        </select>
+        </datalist>
 
         <input
           ref={fileInputRef}
