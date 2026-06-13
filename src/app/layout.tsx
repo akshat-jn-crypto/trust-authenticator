@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import './globals.css';
+import { createClient } from '@/lib/supabase/server';
+import HeaderNav from '@/components/HeaderNav';
 
 export const metadata: Metadata = {
   title: 'Trust Authenticator',
@@ -8,9 +10,14 @@ export const metadata: Metadata = {
     'One verified link for your identity, education, professional and property documents.',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   return (
     <html lang="en">
       <body className="min-h-screen flex flex-col">
@@ -22,17 +29,7 @@ export default function RootLayout({
               </span>
               Trust Authenticator
             </Link>
-            <nav className="flex items-center gap-4 text-sm font-medium text-slate-600">
-              <Link href="/dashboard" className="hover:text-brand-700">
-                Vault
-              </Link>
-              <Link
-                href="/login"
-                className="rounded-md bg-brand-700 px-3 py-1.5 text-white hover:bg-brand-600"
-              >
-                Sign in
-              </Link>
-            </nav>
+            <HeaderNav authed={!!user} />
           </div>
         </header>
         <main className="flex-1">{children}</main>

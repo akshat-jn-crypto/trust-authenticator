@@ -6,6 +6,7 @@ import DigiLockerFetchButton from '@/components/DigiLockerFetchButton';
 import DocumentList from '@/components/DocumentList';
 import TrustScoreBar from '@/components/TrustScoreBar';
 import CopyLinkButton from '@/components/CopyLinkButton';
+import SetPasswordCard from '@/components/SetPasswordCard';
 import {
   CATEGORIES,
   CATEGORY_ORDER,
@@ -136,6 +137,11 @@ export default async function DashboardPage() {
             </section>
           );
         })}
+      </div>
+
+      {/* Account settings */}
+      <div className="mt-8">
+        <SetPasswordCard />
       </div>
     </div>
   );
