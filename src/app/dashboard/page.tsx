@@ -37,6 +37,9 @@ export default async function DashboardPage() {
 
   const docs = documents ?? [];
   const verifiedCount = docs.filter((d) => d.status === 'verified').length;
+  const issuerVerifiedCount = docs.filter(
+    (d) => d.status === 'verified' && d.verification_method === 'digilocker'
+  ).length;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -90,7 +93,11 @@ export default async function DashboardPage() {
 
       {/* Trust score */}
       <div className="mt-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <TrustScoreBar verified={verifiedCount} total={docs.length} />
+        <TrustScoreBar
+          verified={verifiedCount}
+          issuerVerified={issuerVerifiedCount}
+          total={docs.length}
+        />
       </div>
 
       {/* Vault sections */}

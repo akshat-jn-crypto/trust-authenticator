@@ -118,7 +118,8 @@ export default function UploadComponent({
         </label>
 
         <span className="text-xs text-slate-400">
-          PDF, JPG, PNG · max {MAX_SIZE_MB} MB · auto-verified in ~1 minute
+          PDF, JPG, PNG · max {MAX_SIZE_MB} MB · auto-checked in ~1 minute
+          (format only — not issuer-verified)
         </span>
       </div>
 

@@ -61,7 +61,7 @@ export default function DocumentList({ documents }: { documents: DocumentRow[] }
             )}
           </div>
           <div className="flex shrink-0 items-center gap-3">
-            <StatusBadge status={doc.status} />
+            <StatusBadge status={doc.status} method={doc.verification_method} />
             <button
               onClick={() => handleView(doc)}
               disabled={busyId === doc.id}

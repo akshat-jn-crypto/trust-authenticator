@@ -1,5 +1,6 @@
 export type DocCategory = 'professional' | 'identity' | 'education' | 'property';
 export type DocStatus = 'pending' | 'verified' | 'rejected';
+export type VerificationMethod = 'simulated' | 'digilocker' | 'kyc_api';
 
 export interface Profile {
   id: string;
@@ -24,6 +25,8 @@ export interface DocumentRow {
   status: DocStatus;
   reviewer_note: string | null;
   created_at: string;
+  // Present after supabase/digilocker.sql; defaults to 'simulated'.
+  verification_method?: VerificationMethod;
 }
 
 export interface TrustStatusRow {

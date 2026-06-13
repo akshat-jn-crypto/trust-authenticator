@@ -37,8 +37,9 @@ export default async function PublicProfilePage({
     (acc, r) => ({
       total: acc.total + Number(r.total),
       verified: acc.verified + Number(r.verified),
+      issuerVerified: acc.issuerVerified + Number(r.issuer_verified ?? 0),
     }),
-    { total: 0, verified: 0 }
+    { total: 0, verified: 0, issuerVerified: 0 }
   );
 
   return (
@@ -83,7 +84,11 @@ export default async function PublicProfilePage({
         )}
 
         <div className="mt-6 text-left">
-          <TrustScoreBar verified={totals.verified} total={totals.total} />
+          <TrustScoreBar
+            verified={totals.verified}
+            issuerVerified={totals.issuerVerified}
+            total={totals.total}
+          />
         </div>
       </div>
 
@@ -108,32 +113,35 @@ export default async function PublicProfilePage({
                 <p className="text-xs text-slate-400">
                   {total === 0
                     ? 'No documents submitted'
-                    : `${verified} of ${total} document${total > 1 ? 's' : ''} verified`}
+                    : issuerVerified > 0
+                      ? `${issuerVerified} of ${total} issuer-verified`
+                      : `${verified} of ${total} auto-checked`}
                 </p>
               </div>
 
               {isVerified ? (
-                <span
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold ring-1 ring-inset ${
-                    issuerVerified > 0
-                      ? 'bg-emerald-600 text-white ring-emerald-700'
-                      : 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
-                  }`}
-                  title={
-                    issuerVerified > 0
-                      ? 'Contains documents digitally signed by the issuing authority (via DigiLocker)'
-                      : 'Passed automated verification checks'
-                  }
-                >
-                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  {issuerVerified > 0 ? 'Issuer-verified' : 'Verified'}
-                </span>
+                issuerVerified > 0 ? (
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-sm font-semibold text-white ring-1 ring-inset ring-emerald-700"
+                    title="Contains documents digitally signed by the issuing authority (via DigiLocker)"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    Issuer-verified
+                  </span>
+                ) : (
+                  <span
+                    className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-600 ring-1 ring-inset ring-slate-300"
+                    title="Format and integrity checks passed — not authenticity-verified"
+                  >
+                    Auto-checked
+                  </span>
+                )
               ) : (
                 <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-500">
                   {total === 0 ? 'Not provided' : 'Under review'}
@@ -144,9 +152,32 @@ export default async function PublicProfilePage({
         })}
       </div>
 
-      <p className="mt-8 text-center text-xs text-slate-400">
-        Verification statuses are issued by Trust Authenticator. Original
-        documents are never shown on this page.
+      {/* Trust-tier legend — keeps the badges honest */}
+      <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-500">
+        <p className="mb-2 font-semibold text-slate-700">What these badges mean</p>
+        <div className="flex items-start gap-2">
+          <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 font-semibold text-white">
+            ✓ Issuer-verified
+          </span>
+          <span>
+            Document was fetched digitally signed from the issuing authority via
+            DigiLocker. Cannot be forged.
+          </span>
+        </div>
+        <div className="mt-2 flex items-start gap-2">
+          <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600 ring-1 ring-inset ring-slate-300">
+            Auto-checked
+          </span>
+          <span>
+            User-uploaded file that passed format and integrity checks only.
+            Its authenticity has <strong>not</strong> been confirmed with the
+            issuer.
+          </span>
+        </div>
+      </div>
+
+      <p className="mt-6 text-center text-xs text-slate-400">
+        Original documents are never shown on this page.
       </p>
     </div>
   );
