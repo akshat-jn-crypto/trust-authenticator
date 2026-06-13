@@ -58,7 +58,11 @@ export async function POST(request: Request) {
     .from('documents')
     .download(doc.file_path);
   if (dlError || !blob) {
-    return NextResponse.json({ error: 'Could not read the document.' }, { status: 500 });
+    console.error('Storage download failed:', dlError, 'path:', doc.file_path);
+    return NextResponse.json(
+      { error: `Could not read the document: ${dlError?.message ?? 'empty response'}` },
+      { status: 500 }
+    );
   }
 
   let result;
