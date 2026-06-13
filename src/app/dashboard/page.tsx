@@ -102,6 +102,11 @@ export default async function DashboardPage() {
         />
       </div>
 
+      {/* Scoped share links */}
+      <div className="mt-8">
+        <ShareLinkManager documents={docs} />
+      </div>
+
       {/* Vault sections */}
       <div className="mt-8 space-y-6">
         {CATEGORY_ORDER.map((category) => {
@@ -138,11 +143,6 @@ export default async function DashboardPage() {
             </section>
           );
         })}
-      </div>
-
-      {/* Scoped share links */}
-      <div className="mt-8">
-        <ShareLinkManager documents={docs} />
       </div>
 
       {/* Account settings */}
