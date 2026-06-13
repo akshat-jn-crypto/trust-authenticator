@@ -41,6 +41,10 @@ end;
 $$;
 
 -- Surface the check result on the public Trust Link.
+-- DROP first: CREATE OR REPLACE cannot add a column to the return
+-- table of an existing function (Postgres errors), so we replace it.
+drop function if exists public.get_public_claims(text);
+
 create or replace function public.get_public_claims(p_username text)
 returns table (
   category            public.doc_category,
