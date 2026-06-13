@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { claimFieldsFor, type DocumentRow } from '@/lib/types';
+import { claimFieldsFor, type DetailsCheck, type DocumentRow } from '@/lib/types';
 
 // Owner-side editor for the shareable claims on one document.
 // These appear on the public Trust Link; the file never does.
@@ -13,9 +13,13 @@ export default function DocumentDetails({ doc }: { doc: DocumentRow }) {
   const [open, setOpen] = useState(false);
   const [values, setValues] = useState<Record<string, string>>(doc.details ?? {});
   const [saving, setSaving] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const filled = Object.values(doc.details ?? {}).filter(Boolean).length;
+  const check = doc.details_check ?? null;
+  // DigiLocker docs are already issuer-verified — no AI check needed.
+  const showCheck = doc.verification_method !== 'digilocker';
 
   async function save() {
     setSaving(true);
@@ -37,17 +41,78 @@ export default function DocumentDetails({ doc }: { doc: DocumentRow }) {
       return;
     }
     setOpen(false);
+    // Kick off the AI auto-check against the document.
+    if (Object.keys(clean).length > 0) await runCheck();
     router.refresh();
+  }
+
+  async function runCheck() {
+    setChecking(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/check-details', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ docId: doc.id }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(
+          res.status === 501
+            ? 'Auto-check isn’t enabled on this deployment yet.'
+            : body.error ?? 'Could not run the document check.'
+        );
+      }
+    } catch {
+      setError('Could not reach the verification service.');
+    }
+    setChecking(false);
+    router.refresh();
+  }
+
+  function checkBadge(c: DetailsCheck) {
+    if (c.overall === 'match')
+      return <span className="text-xs font-medium text-emerald-700">✓ Matches document</span>;
+    if (c.overall === 'partial')
+      return <span className="text-xs font-medium text-amber-700">⚠ Partially matches</span>;
+    if (c.overall === 'unreadable')
+      return <span className="text-xs font-medium text-slate-500">Document unreadable</span>;
+    return <span className="text-xs font-medium text-red-600">✕ Doesn’t match document</span>;
   }
 
   if (!open) {
     return (
-      <button
-        onClick={() => setOpen(true)}
-        className="text-xs font-medium text-brand-700 hover:underline"
-      >
-        {filled > 0 ? `Edit details (${filled})` : 'Add details to share'}
-      </button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          onClick={() => setOpen(true)}
+          className="text-xs font-medium text-brand-700 hover:underline"
+        >
+          {filled > 0 ? `Edit details (${filled})` : 'Add details to share'}
+        </button>
+        {showCheck && filled > 0 && (
+          <>
+            {checking ? (
+              <span className="text-xs text-slate-400">Checking against document…</span>
+            ) : check ? (
+              checkBadge(check)
+            ) : (
+              <span className="text-xs text-slate-400">Not checked yet</span>
+            )}
+            {!checking && (
+              <button
+                onClick={runCheck}
+                className="text-xs font-medium text-slate-500 hover:underline"
+              >
+                {check ? 'Re-check' : 'Check against document'}
+              </button>
+            )}
+          </>
+        )}
+        {check?.note && !checking && (
+          <span className="w-full text-xs text-slate-400">{check.note}</span>
+        )}
+        {error && <span className="w-full text-xs text-red-600">{error}</span>}
+      </div>
     );
   }
 

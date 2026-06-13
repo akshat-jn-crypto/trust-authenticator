@@ -29,6 +29,8 @@ export interface DocumentRow {
   verification_method?: VerificationMethod;
   // Owner-entered shareable claims; present after supabase/claims.sql.
   details?: Record<string, string>;
+  // AI auto-check result; present after supabase/content-check.sql.
+  details_check?: DetailsCheck | null;
 }
 
 // Shareable, non-sensitive claim fields suggested per document type.
@@ -53,12 +55,21 @@ export function claimFieldsFor(docType: string): string[] {
   return CLAIM_FIELDS[docType] ?? ['Detail'];
 }
 
+export interface DetailsCheck {
+  overall: 'match' | 'mismatch' | 'partial' | 'unreadable';
+  fields: Record<string, { matches: boolean; found: string | null }>;
+  note: string;
+  model: string;
+  checked_at: string;
+}
+
 export interface PublicClaim {
   category: DocCategory;
   doc_type: string;
   details: Record<string, string>;
   verification_method: VerificationMethod;
   issuer: string | null;
+  details_check: DetailsCheck | null;
 }
 
 export interface TrustStatusRow {

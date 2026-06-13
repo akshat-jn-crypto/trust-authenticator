@@ -174,6 +174,7 @@ export default async function PublicProfilePage({
                       ([, v]) => v
                     );
                     if (entries.length === 0) return null;
+                    const matchesDoc = claim.details_check?.overall === 'match';
                     return (
                       <div key={i}>
                         <div className="mb-1 flex items-center gap-2">
@@ -187,10 +188,17 @@ export default async function PublicProfilePage({
                             >
                               ✓ Verified
                             </span>
+                          ) : matchesDoc ? (
+                            <span
+                              className="rounded-full bg-teal-600 px-2 py-0.5 text-[11px] font-semibold text-white"
+                              title="An automated check confirmed these details match the uploaded document (not issuer-verified)"
+                            >
+                              ✓ Matches document
+                            </span>
                           ) : (
                             <span
                               className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 ring-1 ring-inset ring-slate-300"
-                              title="Stated by the profile owner; document on file but not issuer-verified"
+                              title="Stated by the profile owner; document on file but not checked"
                             >
                               Self-declared
                             </span>
