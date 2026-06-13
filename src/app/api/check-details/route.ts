@@ -15,7 +15,7 @@ export const maxDuration = 60;
 export async function POST(request: Request) {
   if (!isContentCheckConfigured()) {
     return NextResponse.json(
-      { error: 'Auto-check is not configured (no OPENAI_API_KEY).' },
+      { error: 'Auto-check is not configured (no GEMENI_API_KEY).' },
       { status: 501 }
     );
   }

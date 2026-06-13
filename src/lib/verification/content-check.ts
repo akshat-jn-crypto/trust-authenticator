@@ -1,8 +1,7 @@
-import OpenAI from 'openai';
-
 // "Auto-check" = does the typed claim match the document's contents?
-// Uses OpenAI vision (gpt-4o-mini) to read the document and compare.
-// This proves consistency, NOT authenticity (that's DigiLocker's job).
+// Uses Google Gemini (free tier) vision to read the document and
+// compare. This proves consistency, NOT authenticity (that's
+// DigiLocker's job). Called via the REST API — no SDK dependency.
 
 export interface FieldResult {
   matches: boolean;
@@ -17,7 +16,10 @@ export interface ContentCheckResult {
   checked_at: string;
 }
 
-const MODEL = 'gpt-4o-mini';
+// Env var is intentionally spelled GEMENI_API_KEY to match the
+// Vercel configuration. Model is overridable.
+const API_KEY_ENV = 'GEMENI_API_KEY';
+const MODEL = process.env.GEMINI_MODEL ?? 'gemini-2.0-flash';
 
 function mimeFromName(fileName: string): string {
   const ext = fileName.toLowerCase().split('.').pop();
@@ -37,7 +39,7 @@ function mimeFromName(fileName: string): string {
 }
 
 export function isContentCheckConfigured(): boolean {
-  return Boolean(process.env.OPENAI_API_KEY);
+  return Boolean(process.env[API_KEY_ENV]);
 }
 
 export async function checkDetailsAgainstDocument(
@@ -45,16 +47,11 @@ export async function checkDetailsAgainstDocument(
   fileName: string,
   claimedDetails: Record<string, string>
 ): Promise<ContentCheckResult> {
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const key = process.env[API_KEY_ENV];
+  if (!key) throw new Error('GEMENI_API_KEY is not configured');
+
   const mime = mimeFromName(fileName);
   const base64 = Buffer.from(fileBytes).toString('base64');
-  const dataUrl = `data:${mime};base64,${base64}`;
-
-  // PDFs go in as a file part; images as an image_url part.
-  const documentPart =
-    mime === 'application/pdf'
-      ? { type: 'file' as const, file: { filename: fileName, file_data: dataUrl } }
-      : { type: 'image_url' as const, image_url: { url: dataUrl } };
 
   const instruction = `You are verifying whether a person's claimed details match an official document.
 
@@ -69,26 +66,44 @@ Respond with ONLY a JSON object of this exact shape:
   "fields": { "<each claimed field name>": { "matches": true|false, "found": "<value seen in the document, or null>" } },
   "note": "<one short sentence summary>"
 }
-"overall" = "match" if every field matches, "mismatch" if none do, "partial" if some do, "unreadable" if the document can't be read.`;
+"overall" = "match" if every field matches, "mismatch" if none do, "partial" if some do, "unreadable" if the document cannot be read.`;
 
-  const completion = await openai.chat.completions.create({
-    model: MODEL,
-    response_format: { type: 'json_object' },
-    messages: [
-      {
-        role: 'user',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        content: [{ type: 'text', text: instruction }, documentPart] as any,
-      },
-    ],
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: instruction },
+            { inline_data: { mime_type: mime, data: base64 } },
+          ],
+        },
+      ],
+      generationConfig: { responseMimeType: 'application/json', temperature: 0 },
+    }),
   });
 
-  const raw = completion.choices[0]?.message?.content ?? '{}';
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Gemini ${res.status}: ${body.slice(0, 300)}`);
+  }
+
+  const data = await res.json();
+  const text: string =
+    data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
+
   let parsed: Partial<ContentCheckResult>;
   try {
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(text);
   } catch {
-    parsed = { overall: 'unreadable', fields: {}, note: 'Could not parse check result.' };
+    parsed = {
+      overall: 'unreadable',
+      fields: {},
+      note: 'Could not parse check result.',
+    };
   }
 
   return {
