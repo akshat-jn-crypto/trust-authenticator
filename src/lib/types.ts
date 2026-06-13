@@ -55,6 +55,25 @@ export function claimFieldsFor(docType: string): string[] {
   return CLAIM_FIELDS[docType] ?? ['Detail'];
 }
 
+// Unique, sorted set of every suggested field name across all
+// document types — offered as autocomplete so the same fact is named
+// consistently from one document to the next.
+export const SUGGESTED_FIELDS: string[] = Array.from(
+  new Set(Object.values(CLAIM_FIELDS).flat())
+).sort();
+
+// A light value hint based on the field name, so similar fields get
+// the same kind of input.
+export function valueHintFor(field: string): { placeholder: string; numeric: boolean } {
+  const k = field.toLowerCase();
+  if (k.includes('year')) return { placeholder: 'e.g. 2024', numeric: true };
+  if (k.includes('percent') || k.includes('marks') || k.includes('cgpa') || k.includes('score'))
+    return { placeholder: 'e.g. 88%', numeric: false };
+  if (k.includes('date') || k.includes('till') || k.includes('valid') || k.includes('month'))
+    return { placeholder: 'e.g. Aug 2024', numeric: false };
+  return { placeholder: 'Value', numeric: false };
+}
+
 export interface DetailsCheck {
   overall: 'match' | 'mismatch' | 'partial' | 'unreadable';
   fields: Record<string, { matches: boolean; found: string | null }>;

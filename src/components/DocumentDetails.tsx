@@ -3,7 +3,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { claimFieldsFor, type DetailsCheck, type DocumentRow } from '@/lib/types';
+import {
+  claimFieldsFor,
+  SUGGESTED_FIELDS,
+  valueHintFor,
+  type DetailsCheck,
+  type DocumentRow,
+} from '@/lib/types';
 
 // Owner-side editor for the shareable claims on one document.
 // These appear on the public Trust Link; the file never does.
@@ -128,39 +134,49 @@ export default function DocumentDetails({ doc }: { doc: DocumentRow }) {
         Add any fields you want to share for this document. Do not enter ID
         numbers or other secrets — only shareable facts.
       </p>
-      <div className="space-y-2">
-        {rows.map((row, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <input
-              value={row.key}
-              onChange={(e) =>
-                setRows((rs) =>
-                  rs.map((r, j) => (j === i ? { ...r, key: e.target.value } : r))
-                )
-              }
-              placeholder="Field name"
-              className="w-2/5 rounded-md border border-slate-300 px-2 py-1 text-sm shadow-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
-            />
-            <input
-              value={row.value}
-              onChange={(e) =>
-                setRows((rs) =>
-                  rs.map((r, j) => (j === i ? { ...r, value: e.target.value } : r))
-                )
-              }
-              placeholder="Value"
-              className="flex-1 rounded-md border border-slate-300 px-2 py-1 text-sm shadow-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
-            />
-            <button
-              type="button"
-              onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}
-              className="shrink-0 rounded px-2 py-1 text-sm text-slate-400 hover:bg-slate-200 hover:text-red-600"
-              aria-label="Remove field"
-            >
-              ✕
-            </button>
-          </div>
+      <datalist id="field-name-suggestions">
+        {SUGGESTED_FIELDS.map((f) => (
+          <option key={f} value={f} />
         ))}
+      </datalist>
+      <div className="space-y-2">
+        {rows.map((row, i) => {
+          const hint = valueHintFor(row.key);
+          return (
+            <div key={i} className="flex items-center gap-2">
+              <input
+                value={row.key}
+                onChange={(e) =>
+                  setRows((rs) =>
+                    rs.map((r, j) => (j === i ? { ...r, key: e.target.value } : r))
+                  )
+                }
+                list="field-name-suggestions"
+                placeholder="Field name"
+                className="w-2/5 rounded-md border border-slate-300 px-2 py-1 text-sm shadow-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
+              />
+              <input
+                value={row.value}
+                onChange={(e) =>
+                  setRows((rs) =>
+                    rs.map((r, j) => (j === i ? { ...r, value: e.target.value } : r))
+                  )
+                }
+                inputMode={hint.numeric ? 'numeric' : 'text'}
+                placeholder={hint.placeholder}
+                className="flex-1 rounded-md border border-slate-300 px-2 py-1 text-sm shadow-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
+              />
+              <button
+                type="button"
+                onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}
+                className="shrink-0 rounded px-2 py-1 text-sm text-slate-400 hover:bg-slate-200 hover:text-red-600"
+                aria-label="Remove field"
+              >
+                ✕
+              </button>
+            </div>
+          );
+        })}
         <button
           type="button"
           onClick={() => setRows((rs) => [...rs, { key: '', value: '' }])}
