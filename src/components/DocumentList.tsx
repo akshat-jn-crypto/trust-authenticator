@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import StatusBadge from '@/components/StatusBadge';
+import DocumentDetails from '@/components/DocumentDetails';
 import type { DocumentRow } from '@/lib/types';
 
 // Owner's view of their uploaded documents: open via short-lived
@@ -45,38 +46,38 @@ export default function DocumentList({ documents }: { documents: DocumentRow[] }
   return (
     <ul className="divide-y divide-slate-100">
       {documents.map((doc) => (
-        <li
-          key={doc.id}
-          className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
-        >
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-slate-800">
-              {doc.doc_type}
-            </p>
-            <p className="truncate text-xs text-slate-400">{doc.file_name}</p>
-            {doc.status === 'rejected' && doc.reviewer_note && (
-              <p className="mt-0.5 text-xs text-red-600">
-                Reason: {doc.reviewer_note}
+        <li key={doc.id} className="py-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-slate-800">
+                {doc.doc_type}
               </p>
-            )}
+              <p className="truncate text-xs text-slate-400">{doc.file_name}</p>
+              {doc.status === 'rejected' && doc.reviewer_note && (
+                <p className="mt-0.5 text-xs text-red-600">
+                  Reason: {doc.reviewer_note}
+                </p>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center gap-3">
+              <StatusBadge status={doc.status} method={doc.verification_method} />
+              <button
+                onClick={() => handleView(doc)}
+                disabled={busyId === doc.id}
+                className="text-sm font-medium text-brand-700 hover:underline disabled:opacity-50"
+              >
+                View
+              </button>
+              <button
+                onClick={() => handleDelete(doc)}
+                disabled={busyId === doc.id}
+                className="text-sm font-medium text-red-600 hover:underline disabled:opacity-50"
+              >
+                Delete
+              </button>
+            </div>
           </div>
-          <div className="flex shrink-0 items-center gap-3">
-            <StatusBadge status={doc.status} method={doc.verification_method} />
-            <button
-              onClick={() => handleView(doc)}
-              disabled={busyId === doc.id}
-              className="text-sm font-medium text-brand-700 hover:underline disabled:opacity-50"
-            >
-              View
-            </button>
-            <button
-              onClick={() => handleDelete(doc)}
-              disabled={busyId === doc.id}
-              className="text-sm font-medium text-red-600 hover:underline disabled:opacity-50"
-            >
-              Delete
-            </button>
-          </div>
+          <DocumentDetails doc={doc} />
         </li>
       ))}
     </ul>

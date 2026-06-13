@@ -27,6 +27,38 @@ export interface DocumentRow {
   created_at: string;
   // Present after supabase/digilocker.sql; defaults to 'simulated'.
   verification_method?: VerificationMethod;
+  // Owner-entered shareable claims; present after supabase/claims.sql.
+  details?: Record<string, string>;
+}
+
+// Shareable, non-sensitive claim fields suggested per document type.
+// Deliberately excludes sensitive identifiers (Aadhaar/PAN numbers).
+export const CLAIM_FIELDS: Record<string, string[]> = {
+  '10th Marksheet': ['Board', 'Year', 'Percentage'],
+  '12th Marksheet': ['Board', 'Year', 'Percentage'],
+  'College Degree': ['Institution', 'Qualification', 'Year'],
+  'Joining Letter': ['Employer', 'Designation', 'Joining Date'],
+  'Salary Slip': ['Employer', 'Designation', 'Month'],
+  ITR: ['Assessment Year'],
+  'Birth Certificate': ['Name', 'Year'],
+  'Aadhaar Card': ['Name'],
+  'PAN Card': ['Name'],
+  Passport: ['Name', 'Expiry Year'],
+  'Driving Licence': ['Name', 'Valid Till'],
+  'Rent Agreement': ['City', 'Valid Till'],
+  'Property Deed': ['City', 'Type'],
+};
+
+export function claimFieldsFor(docType: string): string[] {
+  return CLAIM_FIELDS[docType] ?? ['Detail'];
+}
+
+export interface PublicClaim {
+  category: DocCategory;
+  doc_type: string;
+  details: Record<string, string>;
+  verification_method: VerificationMethod;
+  issuer: string | null;
 }
 
 export interface TrustStatusRow {

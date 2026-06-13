@@ -4,7 +4,9 @@ import TrustScoreBar from '@/components/TrustScoreBar';
 import {
   CATEGORIES,
   CATEGORY_ORDER,
+  type DocCategory,
   type Profile,
+  type PublicClaim,
   type TrustStatusRow,
 } from '@/lib/types';
 
@@ -31,6 +33,17 @@ export default async function PublicProfilePage({
     p_username: profile.username,
   });
   const trustRows = (data ?? []) as TrustStatusRow[];
+
+  const { data: claimData } = await supabase.rpc('get_public_claims', {
+    p_username: profile.username,
+  });
+  const claims = (claimData ?? []) as PublicClaim[];
+  const claimsByCategory = new Map<DocCategory, PublicClaim[]>();
+  for (const c of claims) {
+    const list = claimsByCategory.get(c.category) ?? [];
+    list.push(c);
+    claimsByCategory.set(c.category, list);
+  }
 
   const byCategory = new Map(trustRows.map((r) => [r.category, r]));
   const totals = trustRows.reduce(
@@ -101,51 +114,102 @@ export default async function PublicProfilePage({
           const issuerVerified = Number(row?.issuer_verified ?? 0);
           const isVerified = verified > 0;
 
+          const categoryClaims = claimsByCategory.get(category) ?? [];
+
           return (
             <div
               key={category}
-              className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm"
+              className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm"
             >
-              <div>
-                <p className="font-medium text-slate-900">
-                  {CATEGORIES[category].label}
-                </p>
-                <p className="text-xs text-slate-400">
-                  {total === 0
-                    ? 'No documents submitted'
-                    : issuerVerified > 0
-                      ? `${issuerVerified} of ${total} issuer-verified`
-                      : `${verified} of ${total} auto-checked`}
-                </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-slate-900">
+                    {CATEGORIES[category].label}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {total === 0
+                      ? 'No documents submitted'
+                      : issuerVerified > 0
+                        ? `${issuerVerified} of ${total} issuer-verified`
+                        : `${verified} of ${total} auto-checked`}
+                  </p>
+                </div>
+
+                {isVerified ? (
+                  issuerVerified > 0 ? (
+                    <span
+                      className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-sm font-semibold text-white ring-1 ring-inset ring-emerald-700"
+                      title="Contains documents digitally signed by the issuing authority (via DigiLocker)"
+                    >
+                      <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                        <path
+                          fillRule="evenodd"
+                          d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Issuer-verified
+                    </span>
+                  ) : (
+                    <span
+                      className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-600 ring-1 ring-inset ring-slate-300"
+                      title="Format and integrity checks passed — not authenticity-verified"
+                    >
+                      Auto-checked
+                    </span>
+                  )
+                ) : (
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-500">
+                    {total === 0 ? 'Not provided' : 'Under review'}
+                  </span>
+                )}
               </div>
 
-              {isVerified ? (
-                issuerVerified > 0 ? (
-                  <span
-                    className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-sm font-semibold text-white ring-1 ring-inset ring-emerald-700"
-                    title="Contains documents digitally signed by the issuing authority (via DigiLocker)"
-                  >
-                    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    Issuer-verified
-                  </span>
-                ) : (
-                  <span
-                    className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-600 ring-1 ring-inset ring-slate-300"
-                    title="Format and integrity checks passed — not authenticity-verified"
-                  >
-                    Auto-checked
-                  </span>
-                )
-              ) : (
-                <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-500">
-                  {total === 0 ? 'Not provided' : 'Under review'}
-                </span>
+              {/* Shareable claims — the document file itself stays private */}
+              {categoryClaims.length > 0 && (
+                <div className="mt-3 space-y-3 border-t border-slate-100 pt-3">
+                  {categoryClaims.map((claim, i) => {
+                    const issuerSigned = claim.verification_method === 'digilocker';
+                    const entries = Object.entries(claim.details ?? {}).filter(
+                      ([, v]) => v
+                    );
+                    if (entries.length === 0) return null;
+                    return (
+                      <div key={i}>
+                        <div className="mb-1 flex items-center gap-2">
+                          <span className="text-sm font-medium text-slate-700">
+                            {claim.doc_type}
+                          </span>
+                          {issuerSigned ? (
+                            <span
+                              className="rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-semibold text-white"
+                              title={`Verified from issuer${claim.issuer ? ` (${claim.issuer})` : ''} via DigiLocker`}
+                            >
+                              ✓ Verified
+                            </span>
+                          ) : (
+                            <span
+                              className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 ring-1 ring-inset ring-slate-300"
+                              title="Stated by the profile owner; document on file but not issuer-verified"
+                            >
+                              Self-declared
+                            </span>
+                          )}
+                        </div>
+                        <dl className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
+                          {entries.map(([key, value]) => (
+                            <div key={key} className="flex justify-between gap-2 text-sm">
+                              <dt className="text-slate-400">{key}</dt>
+                              <dd className="text-right font-medium text-slate-800">
+                                {value}
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           );
