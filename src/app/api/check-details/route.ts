@@ -53,8 +53,11 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
-  // Download the private file.
-  const { data: blob, error: dlError } = await admin.storage
+  // Download the private file using the OWNER's session — storage RLS
+  // allows owners to read their own folder (the same path "View" uses).
+  // The newer sb_secret_ key isn't honoured as a privileged role by the
+  // Storage API, so the service-role client can't be used for this read.
+  const { data: blob, error: dlError } = await supabase.storage
     .from('documents')
     .download(doc.file_path);
   if (dlError || !blob) {
@@ -81,7 +84,17 @@ export async function POST(request: Request) {
   }
 
   // Persist the result (service role bypasses the owner-write guard).
-  await admin.from('documents').update({ details_check: result }).eq('id', doc.id);
+  const { error: upErr } = await admin
+    .from('documents')
+    .update({ details_check: result })
+    .eq('id', doc.id);
+  if (upErr) {
+    console.error('details_check write failed:', upErr);
+    return NextResponse.json(
+      { error: `Check ran but could not be saved: ${upErr.message}` },
+      { status: 500 }
+    );
+  }
 
   return NextResponse.json({ result });
 }
