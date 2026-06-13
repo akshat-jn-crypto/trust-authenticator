@@ -84,14 +84,26 @@ export async function POST(request: Request) {
   }
 
   // Persist the result (service role bypasses the owner-write guard).
-  const { error: upErr } = await admin
+  const { data: updated, error: upErr } = await admin
     .from('documents')
     .update({ details_check: result })
-    .eq('id', doc.id);
+    .eq('id', doc.id)
+    .select('id');
   if (upErr) {
     console.error('details_check write failed:', upErr);
     return NextResponse.json(
       { error: `Check ran but could not be saved: ${upErr.message}` },
+      { status: 500 }
+    );
+  }
+  if (!updated || updated.length === 0) {
+    // 0 rows changed with no error = the service-role client isn't
+    // privileged (likely the publishable key is in SUPABASE_SERVICE_ROLE_KEY).
+    return NextResponse.json(
+      {
+        error:
+          'Check ran but the result could not be saved — the SUPABASE_SERVICE_ROLE_KEY appears to be the publishable key, not the secret key.',
+      },
       { status: 500 }
     );
   }
