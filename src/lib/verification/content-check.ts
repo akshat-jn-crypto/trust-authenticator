@@ -19,7 +19,9 @@ export interface ContentCheckResult {
 // Env var is intentionally spelled GEMENI_API_KEY to match the
 // Vercel configuration. Model is overridable.
 const API_KEY_ENV = 'GEMENI_API_KEY';
-const MODEL = process.env.GEMINI_MODEL ?? 'gemini-2.0-flash';
+// gemini-2.0-flash was retired 2026-03-03; 2.5 Flash is the current
+// free-tier multimodal model. Overridable via GEMINI_MODEL.
+const MODEL = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
 
 function mimeFromName(fileName: string): string {
   const ext = fileName.toLowerCase().split('.').pop();
