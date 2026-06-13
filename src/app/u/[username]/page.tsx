@@ -10,6 +10,71 @@ import {
   type TrustStatusRow,
 } from '@/lib/types';
 
+type FactTier = 'digilocker' | 'matched' | 'self';
+const TIER_RANK: Record<FactTier, number> = { self: 1, matched: 2, digilocker: 3 };
+
+interface Fact {
+  key: string;
+  value: string;
+  tier: FactTier;
+}
+
+// Collapse a category's per-document claims into ONE entry per unique
+// fact, tagged with the strongest verification source backing it.
+// (The same "Employer: Axis Bank" stated on two documents shows once,
+// at the highest trust level any of them reached.)
+function dedupeCategoryFacts(claims: PublicClaim[]): Fact[] {
+  const byFact = new Map<string, Fact>();
+  for (const claim of claims) {
+    const issuer = claim.verification_method === 'digilocker';
+    const overallMatch = claim.details_check?.overall === 'match';
+    for (const [key, value] of Object.entries(claim.details ?? {})) {
+      if (!value) continue;
+      let tier: FactTier = 'self';
+      if (issuer) tier = 'digilocker';
+      else if (overallMatch || claim.details_check?.fields?.[key]?.matches === true)
+        tier = 'matched';
+      const id = `${key.trim().toLowerCase()}=${value.trim().toLowerCase()}`;
+      const prev = byFact.get(id);
+      if (!prev || TIER_RANK[tier] > TIER_RANK[prev.tier]) {
+        byFact.set(id, { key, value, tier });
+      }
+    }
+  }
+  return [...byFact.values()];
+}
+
+function FactBadge({ tier }: { tier: FactTier }) {
+  if (tier === 'digilocker') {
+    return (
+      <span
+        className="inline-flex shrink-0 items-center rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-semibold text-white"
+        title="Fetched digitally signed from the issuing authority via DigiLocker"
+      >
+        ✓ DigiLocker verified
+      </span>
+    );
+  }
+  if (tier === 'matched') {
+    return (
+      <span
+        className="inline-flex shrink-0 items-center rounded-full bg-teal-600 px-2 py-0.5 text-[11px] font-semibold text-white"
+        title="An automated check confirmed this matches the uploaded document"
+      >
+        ✓ Matches uploaded document
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex shrink-0 items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 ring-1 ring-inset ring-slate-300"
+      title="Stated by the profile owner; not verified"
+    >
+      Self-declared
+    </span>
+  );
+}
+
 // THE TRUST LINK — public page, works for anonymous visitors.
 // It only ever sees aggregate counts from the get_trust_status RPC;
 // document rows and files are unreachable from here by RLS.
@@ -109,12 +174,11 @@ export default async function PublicProfilePage({
       <div className="mt-6 space-y-3">
         {CATEGORY_ORDER.map((category) => {
           const row = byCategory.get(category);
-          const verified = Number(row?.verified ?? 0);
           const total = Number(row?.total ?? 0);
           const issuerVerified = Number(row?.issuer_verified ?? 0);
-          const isVerified = verified > 0;
 
           const categoryClaims = claimsByCategory.get(category) ?? [];
+          const facts = dedupeCategoryFacts(categoryClaims);
 
           return (
             <div
@@ -129,109 +193,49 @@ export default async function PublicProfilePage({
                   <p className="text-xs text-slate-400">
                     {total === 0
                       ? 'No documents submitted'
-                      : issuerVerified > 0
-                        ? `${issuerVerified} of ${total} issuer-verified`
-                        : `${verified} of ${total} auto-checked`}
+                      : `${total} document${total > 1 ? 's' : ''} on file`}
                   </p>
                 </div>
 
-                {isVerified ? (
-                  issuerVerified > 0 ? (
-                    <span
-                      className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-sm font-semibold text-white ring-1 ring-inset ring-emerald-700"
-                      title="Contains documents digitally signed by the issuing authority (via DigiLocker)"
-                    >
-                      <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
-                        <path
-                          fillRule="evenodd"
-                          d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      Issuer-verified
-                    </span>
-                  ) : (
-                    <span
-                      className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-600 ring-1 ring-inset ring-slate-300"
-                      title="Format and integrity checks passed — not authenticity-verified"
-                    >
-                      Auto-checked
-                    </span>
-                  )
-                ) : (
+                {total === 0 ? (
                   <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-500">
-                    {total === 0 ? 'Not provided' : 'Under review'}
+                    Not provided
+                  </span>
+                ) : issuerVerified > 0 ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-sm font-semibold text-white ring-1 ring-inset ring-emerald-700">
+                    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    Issuer-verified
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-500 ring-1 ring-inset ring-slate-200">
+                    {facts.length > 0 ? 'See details' : 'On file'}
                   </span>
                 )}
               </div>
 
-              {/* Shareable claims — the document file itself stays private */}
-              {categoryClaims.length > 0 && (
-                <div className="mt-3 space-y-3 border-t border-slate-100 pt-3">
-                  {categoryClaims.map((claim, i) => {
-                    const issuerSigned = claim.verification_method === 'digilocker';
-                    const entries = Object.entries(claim.details ?? {}).filter(
-                      ([, v]) => v
-                    );
-                    if (entries.length === 0) return null;
-                    const matchesDoc = claim.details_check?.overall === 'match';
-                    const fieldChecks = claim.details_check?.fields ?? {};
-                    return (
-                      <div key={i}>
-                        <div className="mb-1 flex items-center gap-2">
-                          <span className="text-sm font-medium text-slate-700">
-                            {claim.doc_type}
-                          </span>
-                          {issuerSigned ? (
-                            <span
-                              className="rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-semibold text-white"
-                              title={`Verified from issuer${claim.issuer ? ` (${claim.issuer})` : ''} via DigiLocker`}
-                            >
-                              ✓ Verified
-                            </span>
-                          ) : matchesDoc ? (
-                            <span
-                              className="rounded-full bg-teal-600 px-2 py-0.5 text-[11px] font-semibold text-white"
-                              title="An automated check confirmed these details match the uploaded document (not issuer-verified)"
-                            >
-                              ✓ Matches document
-                            </span>
-                          ) : (
-                            <span
-                              className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 ring-1 ring-inset ring-slate-300"
-                              title="Stated by the profile owner; document on file but not checked"
-                            >
-                              Self-declared
-                            </span>
-                          )}
-                        </div>
-                        <dl className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
-                          {entries.map(([key, value]) => {
-                            const fieldMatched =
-                              issuerSigned || fieldChecks[key]?.matches === true;
-                            return (
-                              <div key={key} className="flex justify-between gap-2 text-sm">
-                                <dt className="text-slate-400">{key}</dt>
-                                <dd className="flex items-center justify-end gap-1 text-right font-medium text-slate-800">
-                                  {fieldMatched && (
-                                    <span
-                                      className="text-emerald-600"
-                                      title="Confirmed against the document"
-                                      aria-label="verified"
-                                    >
-                                      ✓
-                                    </span>
-                                  )}
-                                  {value}
-                                </dd>
-                              </div>
-                            );
-                          })}
-                        </dl>
-                      </div>
-                    );
-                  })}
-                </div>
+              {/* Unique facts — each shown once, with what backs it.
+                  The document file itself is never exposed here. */}
+              {facts.length > 0 && (
+                <dl className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+                  {facts.map((fact, i) => (
+                    <div
+                      key={i}
+                      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm"
+                    >
+                      <dt className="text-slate-400">{fact.key}</dt>
+                      <dd className="flex items-center gap-2">
+                        <span className="font-medium text-slate-800">{fact.value}</span>
+                        <FactBadge tier={fact.tier} />
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
               )}
             </div>
           );
@@ -240,24 +244,32 @@ export default async function PublicProfilePage({
 
       {/* Trust-tier legend — keeps the badges honest */}
       <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-500">
-        <p className="mb-2 font-semibold text-slate-700">What these badges mean</p>
+        <p className="mb-2 font-semibold text-slate-700">What each label means</p>
         <div className="flex items-start gap-2">
-          <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 font-semibold text-white">
-            ✓ Issuer-verified
+          <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-emerald-600 px-2 py-0.5 font-semibold text-white">
+            ✓ DigiLocker verified
           </span>
           <span>
-            Document was fetched digitally signed from the issuing authority via
-            DigiLocker. Cannot be forged.
+            Fetched digitally signed from the issuing authority via DigiLocker —
+            genuine and tamper-proof.
+          </span>
+        </div>
+        <div className="mt-2 flex items-start gap-2">
+          <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-teal-600 px-2 py-0.5 font-semibold text-white">
+            ✓ Matches uploaded document
+          </span>
+          <span>
+            An automated check read the user&apos;s uploaded document and
+            confirmed this detail appears in it. The document&apos;s authenticity
+            is <strong>not</strong> issuer-verified.
           </span>
         </div>
         <div className="mt-2 flex items-start gap-2">
           <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600 ring-1 ring-inset ring-slate-300">
-            Auto-checked
+            Self-declared
           </span>
           <span>
-            User-uploaded file that passed format and integrity checks only.
-            Its authenticity has <strong>not</strong> been confirmed with the
-            issuer.
+            Stated by the profile owner; not checked against any document.
           </span>
         </div>
       </div>
