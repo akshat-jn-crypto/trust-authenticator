@@ -78,7 +78,7 @@ export async function POST(request: Request) {
   } catch (e) {
     console.error('Content check failed:', e);
     return NextResponse.json(
-      { error: 'The verification service could not process this document.' },
+      { error: `Verification failed: ${e instanceof Error ? e.message : String(e)}` },
       { status: 502 }
     );
   }
